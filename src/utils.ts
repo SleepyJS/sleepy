@@ -18,8 +18,6 @@ export function trySaferEval(expression: any, dataContext: any, additionalHelper
 }
 
 export function saferEvalNoReturn(expression: any, dataContext: any, additionalHelperVariables = {}) {
-    // For the cases when users pass only a function reference to the caller: `x-on:click="foo"`
-    // Where "foo" is a function. Also, we'll pass the function the event instance when we call it.
     if (Object.keys(dataContext).includes(expression)) {
         //@ts-ignore
         let methodReference = (new Function(['dataContext', ...Object.keys(additionalHelperVariables)], `with(dataContext) { return ${expression} }`))(
