@@ -1,0 +1,20 @@
+{
+    "compilerOptions": {
+        "target": "ES2020",
+        "module": "ESNext",
+        "rootDir": "src",
+        "moduleResolution": "node",
+        "inlineSourceMap": false,
+        "strict": true,
+        "noUnusedLocals": false,
+        "noUnusedParameters": true,
+        "noImplicitReturns": true,
+        "noImplicitAny": true,
+        "noImplicitThis": true,
+        "lib": ["ES2020", "DOM"],
+        "types": ["node"],
+        "typeRoots": ["node_modules/@types", "src/types"]
+    },
+    "include": ["src/**/*.ts"],
+    "exclude": ["node_modules/**"],
+}
