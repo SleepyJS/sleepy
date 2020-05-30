@@ -3,16 +3,21 @@ import ObservableMembrane from "observable-membrane";
 import { saferEval, walk, getNativeZAttrs, trySaferEval, debounce, saferEvalNoReturn } from "./utils";
 import { NativeZAttr } from "./types/z";
 import { throws } from "assert";
+import { processIfDirective } from "./directives/if";
 
 export default class ZComponent {
     private $el: Element;
     private $data: any;
     private membrane: ObservableMembrane;
+    private $parent: ZComponent|null;
 
-    constructor(element: Element) {
+    constructor(element: Element, parent: ZComponent|null = null) {
         this.$el = element;
 
+        this.$parent = parent;
         const model = this.getModel();
+        model.$el = this.$el;
+        model.$parent = this.$parent ? this.$parent.$data : null;
 
         this.$data = model;
         this.membrane = model.__z_membrane;
@@ -22,7 +27,7 @@ export default class ZComponent {
 
     private findModel(modelName: string | null): any {
         try {
-            return saferEval(modelName, {});
+            return saferEval(modelName, this.$parent && this.$parent.$data ? this.$parent.$data : {});
         } catch (e) {
             return observe({}, this.modelUpdated.bind(this));
         }
@@ -30,14 +35,22 @@ export default class ZComponent {
 
     private getModel(): any {
         if (this.$el.hasAttribute('z-model')) {
-            return this.findModel(this.$el.getAttribute('z-model'));
+            const model = this.findModel(this.$el.getAttribute('z-model'));
+                
+            return !model || !model.__z_membrane ? observe(model, this.modelUpdated.bind(this)).data : model;
         }
 
-        return observe({}, this.modelUpdated.bind(this));
+        return observe({}, this.modelUpdated.bind(this)).data;
     }
 
     private ownModel(): void {
         this.$data.__z_components.push(this);
+        if(this.$parent)
+            this.$parent.$data.__z_components.push(this);
+    }
+
+    private unownModel(): void {
+        this.$data.__z_components = this.$data.__z_components.filter((component: ZComponent) => component != this);
     }
 
     private initialize(): void {
@@ -50,18 +63,18 @@ export default class ZComponent {
         this.updateElements(this.$el);
     }
 
-    private initializeElements(el: Element): void {
+    public initializeElements(el: Element): void {
         this.skipNestedComponents(el, (node: Element) => {
             this.initializeElement(node);
-        }, (node: Element) => node.__z = new ZComponent(node));
+        }, (node: Element) => node.__z = new ZComponent(node, this));
     }
 
     private skipNestedComponents(el: Element, callback: (el: Element) => boolean | void, initializeFn: (el: Element) => void = () => { }): void {
         walk(el, (node: Element) => {
-            if (node.hasAttribute('z-model')) {
+            if (node.hasAttribute('z-model') || node.nodeName == "Z-COMPONENT") {
                 if (!node.isSameNode(this.$el)) {
                     if (!node.__z) initializeFn(node);
-
+                    
                     return false;
                 }
             }
@@ -80,7 +93,7 @@ export default class ZComponent {
             if (node.isSameNode(this.$el)) return;
 
             this.updateElement(node);
-        }, (el: Element) => el.__z = new ZComponent(el));
+        }, (el: Element) => el.__z = new ZComponent(el, this));
     }
 
     private updateElement(el: Element): void {
@@ -127,6 +140,11 @@ export default class ZComponent {
                     break;
 
                 case "model":
+                    break;
+
+                case "if":
+                    const expression = trySaferEval(attr.expression, this.$data);
+                    processIfDirective(this, el, expression);
                     break;
 
                 default:

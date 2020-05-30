@@ -13,7 +13,8 @@ export default class Z {
     }
 
     private initializeComponent(component: Element): void {
-        component.__z = new ZComponent(component);
+        if(!component.__z)
+            component.__z = new ZComponent(component);
     }
 
     public static observe(target: any): any {

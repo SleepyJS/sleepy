@@ -411,8 +411,6 @@
         }
     }
     function saferEvalNoReturn(expression, dataContext, additionalHelperVariables = {}) {
-        // For the cases when users pass only a function reference to the caller: `x-on:click="foo"`
-        // Where "foo" is a function. Also, we'll pass the function the event instance when we call it.
         if (Object.keys(dataContext).includes(expression)) {
             //@ts-ignore
             let methodReference = (new Function(['dataContext', ...Object.keys(additionalHelperVariables)], `with(dataContext) { return ${expression} }`))(dataContext, ...Object.values(additionalHelperVariables));
@@ -451,17 +449,42 @@
         });
     }
 
+    function processIfDirective(component, el, expression) {
+        if (el.nodeName.toLowerCase() !== "template") {
+            console.error('TODO: Implement catching error');
+            return;
+        }
+        const elementHasAlreadyBeenAdded = el.nextElementSibling !== null && el.nextElementSibling.__z_inserted_me === true;
+        if (expression && !elementHasAlreadyBeenAdded) {
+            console.log('test');
+            //@ts-ignore
+            const clone = document.importNode(el.content, true);
+            //@ts-ignore
+            el.parentElement.insertBefore(clone, el.nextElementSibling);
+            //@ts-ignore
+            component.initializeElements(el.nextElementSibling);
+            //@ts-ignore
+            el.nextElementSibling.__z_inserted_me = true;
+        }
+        else if (!expression && elementHasAlreadyBeenAdded && el.nextElementSibling) {
+            el.nextElementSibling.remove();
+        }
+    }
+
     class ZComponent {
-        constructor(element) {
+        constructor(element, parent = null) {
             this.$el = element;
+            this.$parent = parent;
             const model = this.getModel();
+            model.$el = this.$el;
+            model.$parent = this.$parent ? this.$parent.$data : null;
             this.$data = model;
             this.membrane = model.__z_membrane;
             this.initialize();
         }
         findModel(modelName) {
             try {
-                return saferEval(modelName, {});
+                return saferEval(modelName, this.$parent && this.$parent.$data ? this.$parent.$data : {});
             }
             catch (e) {
                 return observe({}, this.modelUpdated.bind(this));
@@ -469,12 +492,18 @@
         }
         getModel() {
             if (this.$el.hasAttribute('z-model')) {
-                return this.findModel(this.$el.getAttribute('z-model'));
+                const model = this.findModel(this.$el.getAttribute('z-model'));
+                return !model || !model.__z_membrane ? observe(model, this.modelUpdated.bind(this)).data : model;
             }
-            return observe({}, this.modelUpdated.bind(this));
+            return observe({}, this.modelUpdated.bind(this)).data;
         }
         ownModel() {
             this.$data.__z_components.push(this);
+            if (this.$parent)
+                this.$parent.$data.__z_components.push(this);
+        }
+        unownModel() {
+            this.$data.__z_components = this.$data.__z_components.filter((component) => component != this);
         }
         initialize() {
             this.ownModel();
@@ -487,11 +516,11 @@
         initializeElements(el) {
             this.skipNestedComponents(el, (node) => {
                 this.initializeElement(node);
-            }, (node) => node.__z = new ZComponent(node));
+            }, (node) => node.__z = new ZComponent(node, this));
         }
         skipNestedComponents(el, callback, initializeFn = () => { }) {
             walk(el, (node) => {
-                if (node.hasAttribute('z-model')) {
+                if (node.hasAttribute('z-model') || node.nodeName == "Z-COMPONENT") {
                     if (!node.isSameNode(this.$el)) {
                         if (!node.__z)
                             initializeFn(node);
@@ -510,7 +539,7 @@
                 if (node.isSameNode(this.$el))
                     return;
                 this.updateElement(node);
-            }, (el) => el.__z = new ZComponent(el));
+            }, (el) => el.__z = new ZComponent(el, this));
         }
         updateElement(el) {
             this.resolveBoundAttrs(el);
@@ -547,6 +576,12 @@
                     case "text":
                         el.innerHTML = trySaferEval(attr.expression, this.$data);
                         break;
+                    case "model":
+                        break;
+                    case "if":
+                        const expression = trySaferEval(attr.expression, this.$data);
+                        processIfDirective(this, el, expression);
+                        break;
                 }
             });
         }
@@ -561,7 +596,8 @@
                 document.querySelectorAll('z-component').forEach(this.initializeComponent);
             }
             initializeComponent(component) {
-                component.__z = new ZComponent(component);
+                if (!component.__z)
+                    component.__z = new ZComponent(component);
             }
             static observe(target) {
                 const observable = observe(target, (target, key) => {

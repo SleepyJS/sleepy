@@ -4,6 +4,7 @@ import ObservableMembrane from "observable-membrane";
 declare global {
     interface Element {
         __z: ZComponent
+        __z_inserted_me: boolean
     }
 
     var __VERSION: string;
