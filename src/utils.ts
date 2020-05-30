@@ -49,14 +49,14 @@ export function walk(el: Element, callback: (el: Element) => boolean | void): vo
 }
 
 export function isNativeZAttr(attr: Attr): boolean {
-    return nativeZAttrRegex.test(attr.name);
+    return nativeZAttrRegex.test(replaceAtAndColon(attr.name));
 }
 
 export function getNativeZAttrs(el: Element): NativeZAttr[] {
     return Array.from(el.attributes)
         .filter(isNativeZAttr)
         .map((attr: Attr) => {
-            const name = attr.name;
+            const name = replaceAtAndColon(attr.name);
             const typeMatch = name.match(nativeZAttrRegex);
             const actionMatch = name.match(/:([a-zA-Z\-:]+)/);
 
@@ -66,6 +66,16 @@ export function getNativeZAttrs(el: Element): NativeZAttr[] {
                 expression: attr.value
             }
         })
+}
+
+export function replaceAtAndColon(name: string) {
+    if (name.startsWith('@')) {
+        return name.replace('@', 'z-on:')
+    } else if (name.startsWith(':')) {
+        return name.replace(':', 'z-bind:')
+    }
+
+    return name
 }
 
 export function debounce(func: Function, wait: number): Function {

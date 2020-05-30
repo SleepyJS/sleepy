@@ -136,6 +136,12 @@ export default class ZComponent {
         nativeAttrs.forEach((attr: NativeZAttr) => {
             switch (attr.type) {
                 case "text":
+                    //@ts-ignore
+                    el.innerText = trySaferEval(attr.expression, this.$data);
+                    break;
+
+                case "html":
+                    console.log('test');
                     el.innerHTML = trySaferEval(attr.expression, this.$data);
                     break;
 

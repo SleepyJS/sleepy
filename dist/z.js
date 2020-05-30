@@ -432,13 +432,13 @@
         }
     }
     function isNativeZAttr(attr) {
-        return nativeZAttrRegex.test(attr.name);
+        return nativeZAttrRegex.test(replaceAtAndColon(attr.name));
     }
     function getNativeZAttrs(el) {
         return Array.from(el.attributes)
             .filter(isNativeZAttr)
             .map((attr) => {
-            const name = attr.name;
+            const name = replaceAtAndColon(attr.name);
             const typeMatch = name.match(nativeZAttrRegex);
             const actionMatch = name.match(/:([a-zA-Z\-:]+)/);
             return {
@@ -447,6 +447,15 @@
                 expression: attr.value
             };
         });
+    }
+    function replaceAtAndColon(name) {
+        if (name.startsWith('@')) {
+            return name.replace('@', 'z-on:');
+        }
+        else if (name.startsWith(':')) {
+            return name.replace(':', 'z-bind:');
+        }
+        return name;
     }
 
     function processIfDirective(component, el, expression) {
@@ -574,6 +583,11 @@
             nativeAttrs.forEach((attr) => {
                 switch (attr.type) {
                     case "text":
+                        //@ts-ignore
+                        el.innerText = trySaferEval(attr.expression, this.$data);
+                        break;
+                    case "html":
+                        console.log('test');
                         el.innerHTML = trySaferEval(attr.expression, this.$data);
                         break;
                     case "model":
