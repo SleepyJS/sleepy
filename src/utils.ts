@@ -1,4 +1,5 @@
 import { NativeZAttr } from "./types/z"
+import DirectiveRegistry from "./directives/directive-registry";
 
 const nativeZAttrRegex = /^z-(on|bind|text|html|model|if|for|show|cloak|ref)\b/
 
@@ -49,7 +50,7 @@ export function walk(el: Element, callback: (el: Element) => boolean | void): vo
 }
 
 export function isNativeZAttr(attr: Attr): boolean {
-    return nativeZAttrRegex.test(replaceAtAndColon(attr.name));
+    return DirectiveRegistry.getHandlerRegex().test(replaceAtAndColon(attr.name));
 }
 
 export function getNativeZAttrs(el: Element): NativeZAttr[] {
@@ -57,7 +58,7 @@ export function getNativeZAttrs(el: Element): NativeZAttr[] {
         .filter(isNativeZAttr)
         .map((attr: Attr) => {
             const name = replaceAtAndColon(attr.name);
-            const typeMatch = name.match(nativeZAttrRegex);
+            const typeMatch = name.match(DirectiveRegistry.getHandlerRegex());
             const actionMatch = name.match(/:([a-zA-Z\-:]+)/);
 
             return {

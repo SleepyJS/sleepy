@@ -4,6 +4,7 @@ import { saferEval, walk, getNativeZAttrs, trySaferEval, debounce, saferEvalNoRe
 import { NativeZAttr } from "./types/z";
 import { throws } from "assert";
 import { processIfDirective } from "./directives/if";
+import DirectiveRegistry from "./directives/directive-registry";
 
 export default class ZComponent {
     private $el: Element;
@@ -133,28 +134,13 @@ export default class ZComponent {
     private resolveBoundAttrs(el: Element, initialUpdate: boolean = false): void {
         const nativeAttrs = getNativeZAttrs(el);
 
-        nativeAttrs.forEach((attr: NativeZAttr) => {
-            switch (attr.type) {
-                case "text":
-                    //@ts-ignore
-                    el.innerText = trySaferEval(attr.expression, this.$data);
-                    break;
+        nativeAttrs.filter(attr => attr.type != null).forEach((attr: NativeZAttr) => {
+            //@ts-ignore
+            const handler = DirectiveRegistry.getHandler(attr.type);
 
-                case "html":
-                    console.log('test');
-                    el.innerHTML = trySaferEval(attr.expression, this.$data);
-                    break;
-
-                case "model":
-                    break;
-
-                case "if":
-                    const expression = trySaferEval(attr.expression, this.$data);
-                    processIfDirective(this, el, expression);
-                    break;
-
-                default:
-                    break;
+            if(handler) {
+                const evaluation = trySaferEval(attr.expression, this.$data);
+                handler(this, el, evaluation);
             }
         });
     }

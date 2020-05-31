@@ -397,7 +397,60 @@
         };
     }
 
-    const nativeZAttrRegex = /^z-(on|bind|text|html|model|if|for|show|cloak|ref)\b/;
+    function processIfDirective(component, el, expression) {
+        if (el.nodeName.toLowerCase() !== "template") {
+            console.error('TODO: Implement catching error');
+            return;
+        }
+        const elementHasAlreadyBeenAdded = el.nextElementSibling !== null && el.nextElementSibling.__z_inserted_me === true;
+        if (expression && !elementHasAlreadyBeenAdded) {
+            console.log('test');
+            //@ts-ignore
+            const clone = document.importNode(el.content, true);
+            //@ts-ignore
+            el.parentElement.insertBefore(clone, el.nextElementSibling);
+            //@ts-ignore
+            component.initializeElements(el.nextElementSibling);
+            //@ts-ignore
+            el.nextElementSibling.__z_inserted_me = true;
+        }
+        else if (!expression && elementHasAlreadyBeenAdded && el.nextElementSibling) {
+            el.nextElementSibling.remove();
+        }
+    }
+
+    function processTextDirective(component, el, expression) {
+        //@ts-ignore
+        el.innerText = expression;
+    }
+    function processHTMLDirective(component, el, expression) {
+        //@ts-ignore
+        el.innerHTML = expression;
+    }
+
+    const DEFAULT_DIRECTIVES = {
+        'if': processIfDirective,
+        'html': processHTMLDirective,
+        'text': processTextDirective
+    };
+    let DirectiveRegistry = /** @class */ (() => {
+        class DirectiveRegistry {
+            static registerDirective(directive, handler) {
+                // TODO: Check handler doesn't exist 
+                this.directives[directive] = handler;
+            }
+            static getHandler(directive) {
+                return this.directives[directive];
+            }
+            static getHandlerRegex() {
+                const keys = Object.keys(this.directives).join('|');
+                return new RegExp(`^z-(on|${keys})\\b`);
+            }
+        }
+        DirectiveRegistry.directives = DEFAULT_DIRECTIVES;
+        return DirectiveRegistry;
+    })();
+
     function saferEval(expression, dataContext, additionalHelperVariables = {}) {
         //@ts-ignore
         return (new Function(['$data', ...Object.keys(additionalHelperVariables)], `let __z_result; with($data) { __z_result = ${expression} }; return __z_result`))(dataContext, ...Object.values(additionalHelperVariables));
@@ -432,14 +485,14 @@
         }
     }
     function isNativeZAttr(attr) {
-        return nativeZAttrRegex.test(replaceAtAndColon(attr.name));
+        return DirectiveRegistry.getHandlerRegex().test(replaceAtAndColon(attr.name));
     }
     function getNativeZAttrs(el) {
         return Array.from(el.attributes)
             .filter(isNativeZAttr)
             .map((attr) => {
             const name = replaceAtAndColon(attr.name);
-            const typeMatch = name.match(nativeZAttrRegex);
+            const typeMatch = name.match(DirectiveRegistry.getHandlerRegex());
             const actionMatch = name.match(/:([a-zA-Z\-:]+)/);
             return {
                 type: typeMatch ? typeMatch[1] : null,
@@ -456,28 +509,6 @@
             return name.replace(':', 'z-bind:');
         }
         return name;
-    }
-
-    function processIfDirective(component, el, expression) {
-        if (el.nodeName.toLowerCase() !== "template") {
-            console.error('TODO: Implement catching error');
-            return;
-        }
-        const elementHasAlreadyBeenAdded = el.nextElementSibling !== null && el.nextElementSibling.__z_inserted_me === true;
-        if (expression && !elementHasAlreadyBeenAdded) {
-            console.log('test');
-            //@ts-ignore
-            const clone = document.importNode(el.content, true);
-            //@ts-ignore
-            el.parentElement.insertBefore(clone, el.nextElementSibling);
-            //@ts-ignore
-            component.initializeElements(el.nextElementSibling);
-            //@ts-ignore
-            el.nextElementSibling.__z_inserted_me = true;
-        }
-        else if (!expression && elementHasAlreadyBeenAdded && el.nextElementSibling) {
-            el.nextElementSibling.remove();
-        }
     }
 
     class ZComponent {
@@ -580,22 +611,12 @@
         //@ts-ignore
         resolveBoundAttrs(el, initialUpdate = false) {
             const nativeAttrs = getNativeZAttrs(el);
-            nativeAttrs.forEach((attr) => {
-                switch (attr.type) {
-                    case "text":
-                        //@ts-ignore
-                        el.innerText = trySaferEval(attr.expression, this.$data);
-                        break;
-                    case "html":
-                        console.log('test');
-                        el.innerHTML = trySaferEval(attr.expression, this.$data);
-                        break;
-                    case "model":
-                        break;
-                    case "if":
-                        const expression = trySaferEval(attr.expression, this.$data);
-                        processIfDirective(this, el, expression);
-                        break;
+            nativeAttrs.filter(attr => attr.type != null).forEach((attr) => {
+                //@ts-ignore
+                const handler = DirectiveRegistry.getHandler(attr.type);
+                if (handler) {
+                    const evaluation = trySaferEval(attr.expression, this.$data);
+                    handler(this, el, evaluation);
                 }
             });
         }
@@ -621,6 +642,9 @@
                     catch (e) { }
                 });
                 return observable.data;
+            }
+            static getDirectiveRegistry() {
+                return DirectiveRegistry;
             }
         }
         Z.VERSION = "1.0.0";

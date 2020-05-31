@@ -1,5 +1,6 @@
 import ZComponent from "./component";
 import { observe } from "./observable";
+import DirectiveRegistry from "./directives/directive-registry";
 
 export default class Z {
     static VERSION: string = __VERSION;
@@ -25,6 +26,10 @@ export default class Z {
         });
 
         return observable.data;
+    }
+
+    public static getDirectiveRegistry() {
+        return DirectiveRegistry;
     }
 }
 
