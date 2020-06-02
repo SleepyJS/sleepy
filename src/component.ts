@@ -86,6 +86,12 @@ export default class ZComponent {
 
     private initializeElement(el: Element): void {
         this.resolveListeners(el);
+
+        if(el.getAttribute('class') != null) {
+            //@ts-ignore
+            el.__z_original_classes = el.getAttribute('class').split(' ')
+        }
+
         this.resolveBoundAttrs(el, true);
     }
 
@@ -140,7 +146,7 @@ export default class ZComponent {
 
             if(handler) {
                 const evaluation = trySaferEval(attr.expression, this.$data);
-                handler(this, el, evaluation);
+                handler(this, attr.action, el, evaluation);
             }
         });
     }

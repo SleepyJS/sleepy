@@ -1,10 +1,12 @@
 import { DirectiveHandler } from "../types/z";
+import { processBindDirective } from "./bind";
 import { processIfDirective } from "./if";
 import { processHTMLDirective, processTextDirective } from "./text";
 
 export const DEFAULT_DIRECTIVES: {[index: string]: DirectiveHandler} = {
-    'if': processIfDirective,
+    'bind': processBindDirective,
     'html': processHTMLDirective,
+    'if': processIfDirective,
     'text': processTextDirective
 }
 
@@ -16,7 +18,7 @@ export default class DirectiveRegistry {
         this.directives[directive] = handler;
     }
 
-    public static getHandler(directive: string) {
+    public static getHandler(directive: string): DirectiveHandler {
         return this.directives[directive];
     }
 

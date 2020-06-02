@@ -1,6 +1,6 @@
 import ZComponent from "../component";
 
-export function processIfDirective(component: ZComponent, el: Element, expression: any) {
+export function processIfDirective(component: ZComponent, action: string|null, el: Element, expression: any) {
     if(el.nodeName.toLowerCase() !== "template") {
         console.error('TODO: Implement catching error');
         return;
