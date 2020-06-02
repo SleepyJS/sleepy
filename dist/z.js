@@ -397,10 +397,120 @@
         };
     }
 
+    function saferEval(expression, dataContext, additionalHelperVariables = {}) {
+        //@ts-ignore
+        return (new Function(['$data', ...Object.keys(additionalHelperVariables)], `let __z_result; with($data) { __z_result = ${expression} }; return __z_result`))(dataContext, ...Object.values(additionalHelperVariables));
+    }
+    function trySaferEval(expression, dataContext, additionalHelperVariables = {}, defaultReturn = null) {
+        try {
+            return saferEval(expression, dataContext, additionalHelperVariables);
+        }
+        catch (e) {
+            return defaultReturn;
+        }
+    }
+    function saferEvalNoReturn(expression, dataContext, additionalHelperVariables = {}) {
+        if (Object.keys(dataContext).includes(expression)) {
+            //@ts-ignore
+            let methodReference = (new Function(['dataContext', ...Object.keys(additionalHelperVariables)], `with(dataContext) { return ${expression} }`))(dataContext, ...Object.values(additionalHelperVariables));
+            if (typeof methodReference === 'function') {
+                //@ts-ignore
+                return methodReference.call(dataContext, additionalHelperVariables['$event']);
+            }
+        }
+        //@ts-ignore
+        return (new Function(['dataContext', ...Object.keys(additionalHelperVariables)], `with(dataContext) { ${expression} }`))(dataContext, ...Object.values(additionalHelperVariables));
+    }
+    function walk(el, callback) {
+        if (callback(el) === false)
+            return;
+        let node = el.firstElementChild;
+        while (node) {
+            walk(node, callback);
+            node = node.nextElementSibling;
+        }
+    }
+    function isNativeZAttr(attr) {
+        return DirectiveRegistry.getHandlerRegex().test(replaceAtAndColon(attr.name));
+    }
+    function getNativeZAttrs(el) {
+        return Array.from(el.attributes)
+            .filter(isNativeZAttr)
+            .map((attr) => {
+            const name = replaceAtAndColon(attr.name);
+            const typeMatch = name.match(DirectiveRegistry.getHandlerRegex());
+            const actionMatch = name.match(/:([a-zA-Z\-:]+)/);
+            return {
+                type: typeMatch ? typeMatch[1] : null,
+                action: actionMatch ? actionMatch[1] : null,
+                expression: attr.value
+            };
+        });
+    }
+    function replaceAtAndColon(name) {
+        if (name.startsWith('@')) {
+            return name.replace('@', 'z-on:');
+        }
+        else if (name.startsWith(':')) {
+            return name.replace(':', 'z-bind:');
+        }
+        return name;
+    }
+    function isBooleanAttr(attrName) {
+        const booleanAttributes = [
+            'disabled', 'checked', 'required', 'readonly', 'hidden', 'open', 'selected',
+            'autofocus', 'itemscope', 'multiple', 'novalidate', 'allowfullscreen',
+            'allowpaymentrequest', 'formnovalidate', 'autoplay', 'controls', 'loop',
+            'muted', 'playsinline', 'default', 'ismap', 'reversed', 'async', 'defer',
+            'nomodule'
+        ];
+        return booleanAttributes.includes(attrName);
+    }
+    function domReady() {
+        return new Promise(resolve => {
+            if (document.readyState == "loading") {
+                document.addEventListener("DOMContentLoaded", resolve);
+            }
+            else {
+                resolve();
+            }
+        });
+    }
+
     function processBindDirective(component, action, el, expression) {
         if (action == null)
             return; // TODO: Throw error on no binding
-        if (action == "value") ;
+        if (action == "value") {
+            if (expression === undefined && expression.match(/\./).length) {
+                expression = '';
+            }
+            const type = el.type;
+            if (type == 'radio') {
+                el.value = expression;
+            }
+            else if (type == 'checkbox') {
+                if (Array.isArray(expression)) {
+                    el.checked = expression.some(val => val == el.value);
+                }
+                else {
+                    el.checked = !!expression;
+                }
+                if (typeof expression === 'string') {
+                    el.value = expression;
+                }
+            }
+            else if (el.tagName == 'SELECT') {
+                const arrayWrappedValue = [].concat(expression).map(value => { return value + ''; });
+                Array.from(el.options).forEach(option => {
+                    option.selected = arrayWrappedValue.includes(option.value || option.text);
+                });
+            }
+            else {
+                if (el.value === expression)
+                    return;
+                el.value = expression;
+            }
+        }
         else if (action == "class") {
             if (Array.isArray(expression)) {
                 const originalClasses = el.__z_original_classes ?? [];
@@ -488,76 +598,6 @@
         return DirectiveRegistry;
     })();
 
-    function saferEval(expression, dataContext, additionalHelperVariables = {}) {
-        //@ts-ignore
-        return (new Function(['$data', ...Object.keys(additionalHelperVariables)], `let __z_result; with($data) { __z_result = ${expression} }; return __z_result`))(dataContext, ...Object.values(additionalHelperVariables));
-    }
-    function trySaferEval(expression, dataContext, additionalHelperVariables = {}, defaultReturn = null) {
-        try {
-            return saferEval(expression, dataContext, additionalHelperVariables);
-        }
-        catch (e) {
-            return defaultReturn;
-        }
-    }
-    function saferEvalNoReturn(expression, dataContext, additionalHelperVariables = {}) {
-        if (Object.keys(dataContext).includes(expression)) {
-            //@ts-ignore
-            let methodReference = (new Function(['dataContext', ...Object.keys(additionalHelperVariables)], `with(dataContext) { return ${expression} }`))(dataContext, ...Object.values(additionalHelperVariables));
-            if (typeof methodReference === 'function') {
-                //@ts-ignore
-                return methodReference.call(dataContext, additionalHelperVariables['$event']);
-            }
-        }
-        //@ts-ignore
-        return (new Function(['dataContext', ...Object.keys(additionalHelperVariables)], `with(dataContext) { ${expression} }`))(dataContext, ...Object.values(additionalHelperVariables));
-    }
-    function walk(el, callback) {
-        if (callback(el) === false)
-            return;
-        let node = el.firstElementChild;
-        while (node) {
-            walk(node, callback);
-            node = node.nextElementSibling;
-        }
-    }
-    function isNativeZAttr(attr) {
-        return DirectiveRegistry.getHandlerRegex().test(replaceAtAndColon(attr.name));
-    }
-    function getNativeZAttrs(el) {
-        return Array.from(el.attributes)
-            .filter(isNativeZAttr)
-            .map((attr) => {
-            const name = replaceAtAndColon(attr.name);
-            const typeMatch = name.match(DirectiveRegistry.getHandlerRegex());
-            const actionMatch = name.match(/:([a-zA-Z\-:]+)/);
-            return {
-                type: typeMatch ? typeMatch[1] : null,
-                action: actionMatch ? actionMatch[1] : null,
-                expression: attr.value
-            };
-        });
-    }
-    function replaceAtAndColon(name) {
-        if (name.startsWith('@')) {
-            return name.replace('@', 'z-on:');
-        }
-        else if (name.startsWith(':')) {
-            return name.replace(':', 'z-bind:');
-        }
-        return name;
-    }
-    function isBooleanAttr(attrName) {
-        const booleanAttributes = [
-            'disabled', 'checked', 'required', 'readonly', 'hidden', 'open', 'selected',
-            'autofocus', 'itemscope', 'multiple', 'novalidate', 'allowfullscreen',
-            'allowpaymentrequest', 'formnovalidate', 'autoplay', 'controls', 'loop',
-            'muted', 'playsinline', 'default', 'ismap', 'reversed', 'async', 'defer',
-            'nomodule'
-        ];
-        return booleanAttributes.includes(attrName);
-    }
-
     class ZComponent {
         constructor(element, parent = null) {
             this.$el = element;
@@ -578,8 +618,8 @@
             }
         }
         getModel() {
-            if (this.$el.hasAttribute('z-model')) {
-                const model = this.findModel(this.$el.getAttribute('z-model'));
+            if (this.$el.hasAttribute('z-with')) {
+                const model = this.findModel(this.$el.getAttribute('z-with'));
                 return !model || !model.__z_membrane ? observe(model, this.modelUpdated.bind(this)).data : model;
             }
             return observe({}, this.modelUpdated.bind(this)).data;
@@ -603,11 +643,11 @@
         initializeElements(el) {
             this.skipNestedComponents(el, (node) => {
                 this.initializeElement(node);
-            }, (node) => node.__z = new ZComponent(node, this));
+            }, (node) => { });
         }
         skipNestedComponents(el, callback, initializeFn = () => { }) {
             walk(el, (node) => {
-                if (node.hasAttribute('z-model') || node.nodeName == "Z-COMPONENT") {
+                if (node.hasAttribute('z-with') || node.nodeName == "Z-COMPONENT") {
                     if (!node.isSameNode(this.$el)) {
                         if (!node.__z)
                             initializeFn(node);
@@ -630,7 +670,7 @@
                 if (node.isSameNode(this.$el))
                     return;
                 this.updateElement(node);
-            }, (el) => el.__z = new ZComponent(el, this));
+            }, (el) => { });
         }
         updateElement(el) {
             this.resolveBoundAttrs(el);
@@ -673,18 +713,46 @@
         }
     }
 
+    class ZComponentElement extends HTMLElement {
+        constructor() {
+            super();
+            domReady().then(this.initialize.bind(this));
+        }
+        async initialize() {
+            const parent = this.getParentComponent();
+            if (!this.__z && !parent) {
+                this.__z = new ZComponent(this);
+            }
+            else if (!this.__z && parent) {
+                await this.parentInitialization(parent);
+                this.__z = new ZComponent(this, parent.__z);
+            }
+        }
+        getParentComponent() {
+            let node = this.parentElement;
+            while (node) {
+                if (node.tagName == "Z-COMPONENT")
+                    return node;
+                node = node.parentElement;
+            }
+            return null;
+        }
+        parentInitialization(parent) {
+            return new Promise((resolve) => {
+                if (parent.__z)
+                    return resolve();
+                setTimeout(() => this.waitForParent(parent, resolve), 50);
+            });
+        }
+        waitForParent(parent, resolve) {
+            if (parent.__z)
+                return resolve();
+            setTimeout(() => this.waitForParent(parent, resolve), 50);
+        }
+    }
+
     let Z = /** @class */ (() => {
         class Z {
-            async start() {
-                this.discover();
-            }
-            discover() {
-                document.querySelectorAll('z-component').forEach(this.initializeComponent);
-            }
-            initializeComponent(component) {
-                if (!component.__z)
-                    component.__z = new ZComponent(component);
-            }
             static observe(target) {
                 const observable = observe(target, (target, key) => {
                     try {
@@ -701,8 +769,7 @@
         Z.VERSION = "1.0.0";
         return Z;
     })();
-    const z = new Z();
-    document.addEventListener('DOMContentLoaded', () => z.start());
+    window.customElements.define('z-component', ZComponentElement);
 
     return Z;
 

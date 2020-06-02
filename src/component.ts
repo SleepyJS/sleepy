@@ -35,8 +35,8 @@ export default class ZComponent {
     }
 
     private getModel(): any {
-        if (this.$el.hasAttribute('z-model')) {
-            const model = this.findModel(this.$el.getAttribute('z-model'));
+        if (this.$el.hasAttribute('z-with')) {
+            const model = this.findModel(this.$el.getAttribute('z-with'));
                 
             return !model || !model.__z_membrane ? observe(model, this.modelUpdated.bind(this)).data : model;
         }
@@ -67,12 +67,12 @@ export default class ZComponent {
     public initializeElements(el: Element): void {
         this.skipNestedComponents(el, (node: Element) => {
             this.initializeElement(node);
-        }, (node: Element) => node.__z = new ZComponent(node, this));
+        }, (node: Element) => {});
     }
 
     private skipNestedComponents(el: Element, callback: (el: Element) => boolean | void, initializeFn: (el: Element) => void = () => { }): void {
         walk(el, (node: Element) => {
-            if (node.hasAttribute('z-model') || node.nodeName == "Z-COMPONENT") {
+            if (node.hasAttribute('z-with') || node.nodeName == "Z-COMPONENT") {
                 if (!node.isSameNode(this.$el)) {
                     if (!node.__z) initializeFn(node);
                     
@@ -100,7 +100,7 @@ export default class ZComponent {
             if (node.isSameNode(this.$el)) return;
 
             this.updateElement(node);
-        }, (el: Element) => el.__z = new ZComponent(el, this));
+        }, (el: Element) => {});
     }
 
     private updateElement(el: Element): void {

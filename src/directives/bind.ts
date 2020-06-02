@@ -5,7 +5,35 @@ export function processBindDirective(component: ZComponent, action: string | nul
     if (action == null) return; // TODO: Throw error on no binding
 
     if (action == "value") {
+        if (expression === undefined && expression.match(/\./).length) {
+            expression = ''
+        }
 
+        const type = (el as HTMLInputElement).type;
+
+        if(type == 'radio') {
+            (el as HTMLInputElement).value = expression;
+        } else if (type == 'checkbox') {
+            if(Array.isArray(expression)) {
+                (el as HTMLInputElement).checked = expression.some(val => val == (el as HTMLInputElement).value)
+            } else {
+                (el as HTMLInputElement).checked = !!expression;
+            }
+
+            if (typeof expression === 'string') {
+                (el as HTMLInputElement).value = expression
+            }
+        } else if(el.tagName == 'SELECT') {
+            const arrayWrappedValue = [].concat(expression).map(value => { return value + '' })
+
+            Array.from((el as HTMLSelectElement).options).forEach(option => {
+                option.selected = arrayWrappedValue.includes(option.value || option.text)
+            });
+        } else {
+            if ((el as HTMLInputElement).value === expression) return
+
+            (el as HTMLInputElement).value = expression
+        }
     } else if (action == "class") {
         if(Array.isArray(expression)) {
             const originalClasses = el.__z_original_classes ?? [];
