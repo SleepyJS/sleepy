@@ -22,4 +22,4 @@ export interface NativeZAttr {
     expression: string
 }
 
-export type DirectiveHandler = (component: ZComponent, action: string|null, el: Element, expression: any) => void;
+export type DirectiveHandler = (component: ZComponent, action: string|null, el: Element, expression: any, rawExpression: any = null) => void;

@@ -579,10 +579,50 @@
         el.innerHTML = expression;
     }
 
+    function processModelDirective(component, action, el, expression, rawExpression) {
+        const event = (el.tagName.toLowerCase() === 'select')
+            || ['checkbox', 'radio'].includes(el.type)
+            ? 'change' : 'input';
+        const listenerExpression = `${rawExpression} = rightSideOfExpression($event, ${rawExpression})`;
+        processBindDirective(component, 'value', el, expression);
+        component.registerListener(event, listenerExpression, el, {
+            rightSideOfExpression: generateModelAssignmentFunction(el, expression)
+        });
+    }
+    function generateModelAssignmentFunction(el, expression) {
+        if (el.type === 'radio') {
+            if (!el.hasAttribute('name'))
+                el.setAttribute('name', expression);
+        }
+        return (event, currentValue) => {
+            if (event instanceof CustomEvent && event.detail) {
+                return event.detail;
+            }
+            else if (el.type === 'checkbox') {
+                if (Array.isArray(currentValue)) {
+                    return event.target.checked ? currentValue.concat([event.target.value]) : currentValue.filter(i => i !== event.target.value);
+                }
+                else {
+                    return event.target.checked;
+                }
+            }
+            else if (el.tagName.toLowerCase() === 'select' && el.multiple) {
+                return Array.from(event.target.selectedOptions).map((option) => {
+                    return option.value || option.text;
+                });
+            }
+            else {
+                const rawValue = event.target.value;
+                return rawValue;
+            }
+        };
+    }
+
     const DEFAULT_DIRECTIVES = {
         'bind': processBindDirective,
         'html': processHTMLDirective,
         'if': processIfDirective,
+        'model': processModelDirective,
         'text': processTextDirective
     };
     let DirectiveRegistry = /** @class */ (() => {
@@ -696,14 +736,18 @@
                 switch (attr.type) {
                     case "on":
                         if (attr.action)
-                            el.addEventListener(attr.action, (e) => {
-                                saferEvalNoReturn(attr.expression, this.$data, {
-                                    ...{ '$event': e },
-                                    $dispatch: this.getDispatchFunction(el),
-                                });
-                            });
+                            this.registerListener(attr.action, attr.expression, el);
                         break;
                 }
+            });
+        }
+        registerListener(event, expression, el, extraVars = {}) {
+            el.addEventListener(event, (e) => {
+                saferEvalNoReturn(expression, this.$data, {
+                    ...{ '$event': e },
+                    $dispatch: this.getDispatchFunction(el),
+                    ...extraVars
+                });
             });
         }
         getDispatchFunction(el) {
@@ -722,7 +766,7 @@
                 const handler = DirectiveRegistry.getHandler(attr.type);
                 if (handler) {
                     const evaluation = trySaferEval(attr.expression, this.$data);
-                    handler(this, attr.action, el, evaluation);
+                    handler(this, attr.action, el, evaluation, attr.expression);
                 }
             });
         }

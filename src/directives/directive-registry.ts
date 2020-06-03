@@ -2,11 +2,13 @@ import { DirectiveHandler } from "../types/z";
 import { processBindDirective } from "./bind";
 import { processIfDirective } from "./if";
 import { processHTMLDirective, processTextDirective } from "./text";
+import { processModelDirective } from "./model";
 
 export const DEFAULT_DIRECTIVES: {[index: string]: DirectiveHandler} = {
     'bind': processBindDirective,
     'html': processHTMLDirective,
     'if': processIfDirective,
+    'model': processModelDirective,
     'text': processTextDirective
 }
 

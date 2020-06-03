@@ -128,16 +128,22 @@ export default class ZComponent {
             switch (attr.type) {
                 case "on":
                     if(attr.action)
-                        el.addEventListener(attr.action, (e) => {
-                            saferEvalNoReturn(attr.expression, this.$data, {
-                                ...{'$event': e},
-                                $dispatch: this.getDispatchFunction(el),
-                            })
-                        })
+                        this.registerListener(attr.action, attr.expression, el);
                     break;
                 default:
                     break
             }
+        })
+    }
+
+    public registerListener(event: string, expression: any, el: Element, extraVars: any = {}): void 
+    {
+        el.addEventListener(event, (e) => {
+            saferEvalNoReturn(expression, this.$data, {
+                ...{'$event': e},
+                $dispatch: this.getDispatchFunction(el),
+                ...extraVars
+            });
         })
     }
 
@@ -160,7 +166,7 @@ export default class ZComponent {
 
             if(handler) {
                 const evaluation = trySaferEval(attr.expression, this.$data);
-                handler(this, attr.action, el, evaluation);
+                handler(this, attr.action, el, evaluation, attr.expression);
             }
         });
     }
