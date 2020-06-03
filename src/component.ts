@@ -46,8 +46,19 @@ export default class ZComponent {
 
     private ownModel(): void {
         this.$data.__z_components.push(this);
+
         if(this.$parent)
-            this.$parent.$data.__z_components.push(this);
+            this.ownParentModels();
+    }
+
+    private ownParentModels(): void {
+        let parent = this.$parent;
+
+        while(parent) {
+            parent.$data.__z_components.push(this);
+
+            parent = parent.$parent;
+        }
     }
 
     private unownModel(): void {
@@ -66,7 +77,10 @@ export default class ZComponent {
 
     public initializeElements(el: Element): void {
         this.skipNestedComponents(el, (node: Element) => {
+            if(node.__z_inserted_me) return false;
+
             this.initializeElement(node);
+            return true;
         }, (node: Element) => {});
     }
 

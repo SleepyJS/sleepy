@@ -385,6 +385,11 @@
             valueMutated(target, key) {
                 if (typeof key === 'string' && key.startsWith('__z_'))
                     return;
+                if (target.__z_components) {
+                    target.__z_components.forEach((component) => {
+                        component.modelUpdated(target, key);
+                    });
+                }
                 changeCallback(target, key);
             }
         });
@@ -627,7 +632,14 @@
         ownModel() {
             this.$data.__z_components.push(this);
             if (this.$parent)
-                this.$parent.$data.__z_components.push(this);
+                this.ownParentModels();
+        }
+        ownParentModels() {
+            let parent = this.$parent;
+            while (parent) {
+                parent.$data.__z_components.push(this);
+                parent = parent.$parent;
+            }
         }
         unownModel() {
             this.$data.__z_components = this.$data.__z_components.filter((component) => component != this);
@@ -642,7 +654,10 @@
         }
         initializeElements(el) {
             this.skipNestedComponents(el, (node) => {
+                if (node.__z_inserted_me)
+                    return false;
                 this.initializeElement(node);
+                return true;
             }, (node) => { });
         }
         skipNestedComponents(el, callback, initializeFn = () => { }) {
